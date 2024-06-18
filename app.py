@@ -1,4 +1,5 @@
-#app.py
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Form, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,25 +13,36 @@ from models import UserData
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.on_event("startup")
-async def on_startup():
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     await init_db()
+    yield
+    # No explicit cleanup needed unless you have resources that require manual teardown
+
+
+app.lifespan = lifespan
+
 
 # Dependency to get the session
 async def get_session() -> AsyncSession:
     async with async_session() as session:
         yield session
 
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index(session: AsyncSession = Depends(get_session)):
     try:
         users = await get_users(session)
-        with open("templates/index.html", 'r') as file:
+        with open("templates/index.html", "r") as file:
             content = file.read()
-        users_html = "".join(f'<li>{user.name} ({user.email})</li>' for user in users)
-        return HTMLResponse(content.replace('<!-- Users will be displayed here -->', users_html))
+        users_html = "".join(f"<li>{user.name} ({user.email})</li>" for user in users)
+        return HTMLResponse(
+            content.replace("<!-- Users will be displayed here -->", users_html)
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @app.get("/get_users", response_class=JSONResponse)
 async def get_users_json(session: AsyncSession = Depends(get_session)):
@@ -40,10 +52,12 @@ async def get_users_json(session: AsyncSession = Depends(get_session)):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+
 async def get_users(session: AsyncSession):
     statement = select(UserData)
     result = await session.execute(statement)
     return result.scalars().all()
+
 
 @app.post("/api/submit")
 async def submit(name: str = Form(...), email: str = Form(...)):
@@ -55,4 +69,3 @@ async def submit(name: str = Form(...), email: str = Form(...)):
         return RedirectResponse(url="/", status_code=303)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal Server Error")
-

@@ -1,4 +1,4 @@
-#config.py
+# config.py
 import os
 from dotenv import load_dotenv
 from sqlalchemy import inspect
@@ -13,11 +13,13 @@ POSTGRES_URI = os.environ["POSTGRES_URI"]
 engine = create_async_engine(POSTGRES_URI, echo=True, future=True)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+
 def sync_init_db(conn):
     inspector = inspect(conn)
     for table in Base.metadata.sorted_tables:
         if not inspector.has_table(table.name):
             table.create(bind=conn, checkfirst=True)
+
 
 async def init_db():
     async with engine.begin() as conn:
