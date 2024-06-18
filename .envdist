@@ -1,0 +1,1 @@
+POSTGRES_URI=postgresql+asyncpg://postgres_user:postgres_password@localhost/postgres_db_name
